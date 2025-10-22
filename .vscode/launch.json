@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'dos_esfinges_bot'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=dos_esfinges_bot",
+                    "--package=dos_esfinges_bot"
+                ],
+                "filter": {
+                    "name": "dos_esfinges_bot",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--config", "config.json"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=dos_esfinges_bot",
+                    "--package=dos_esfinges_bot"
+                ],
+                "filter": {
+                    "name": "dos_esfinges_bot",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
