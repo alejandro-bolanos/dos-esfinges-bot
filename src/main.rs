@@ -216,9 +216,19 @@ impl Bot {
         } else if content == "duplicates" && is_teacher {
             info!("Processing duplicates command (teacher)");
             submission::process_duplicates(&self.db)
-        } else if content == "leaderboard" && is_teacher {
+        } else if content.starts_with("leaderboard") && is_teacher {
             info!("Processing leaderboard command (teacher)");
-            submission::process_leaderboard_full(&self.db, &self.config)
+            let parts: Vec<&str> = message.content.trim().split_whitespace().collect();
+            let order_by = if parts.len() >= 2 {
+                match parts[1].to_lowercase().as_str() {
+                    "datetime" => "datetime",
+                    "gain" => "gain",
+                    _ => "gain", // default to gain for invalid options
+                }
+            } else {
+                "gain" // default to gain
+            };
+            submission::process_leaderboard_full(&self.db, &self.config, order_by)
         } else if content == "all submits" && is_teacher {
             info!("Processing all submits command (teacher)");
             submission::process_all_submits(&self.db)
@@ -263,7 +273,7 @@ impl Bot {
                 **Fecha límite:** {}\n\n\
                 **Comandos disponibles:**\n\
                 • `duplicates` - Listar envíos duplicados\n\
-                • `leaderboard` - Leaderboard completo con estadísticas\n\
+                • `leaderboard [gain|datetime]` - Leaderboard completo con estadísticas (ordenado por ganancia o fecha)\n\
                 • `all submits` - Ver todos los envíos del sistema\n\
                 • `user submits <email_o_nombre>` - Ver envíos de un usuario específico\n\
                 • `help` - Mostrar esta ayuda\n\n\

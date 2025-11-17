@@ -141,9 +141,15 @@ impl Database {
         Ok(duplicates)
     }
 
-    pub fn get_leaderboard(&self) -> Result<Vec<(String, String, String, f64, f64, i32, Option<f64>)>> {
+    pub fn get_leaderboard(&self, order_by: &str) -> Result<Vec<(String, String, String, f64, f64, i32, Option<f64>)>> {
         let conn = self.get_connection()?;
-        let mut stmt = conn.prepare(
+        
+        let order_clause = match order_by {
+            "datetime" => "ORDER BY timestamp DESC",
+            _ => "ORDER BY final_gain DESC", // default to gain
+        };
+        
+        let query = format!(
             "WITH last_valid_submission AS (
                 SELECT 
                     user_id,
@@ -184,8 +190,11 @@ impl Database {
                 max_gain
             FROM user_stats
             WHERE final_gain IS NOT NULL
-            ORDER BY final_gain DESC",
-        )?;
+            {}",
+            order_clause
+        );
+        
+        let mut stmt = conn.prepare(&query)?;
 
         let results = stmt
             .query_map([], |row| {

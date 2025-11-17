@@ -257,8 +257,8 @@ pub fn process_duplicates(db: &Database) -> String {
     response
 }
 
-pub fn process_leaderboard_full(db: &Database, config: &BotConfig) -> String {
-    let results = match db.get_leaderboard() {
+pub fn process_leaderboard_full(db: &Database, config: &BotConfig, order_by: &str) -> String {
+    let results = match db.get_leaderboard(order_by) {
         Ok(r) => r,
         Err(e) => return format!("❌ Error obteniendo leaderboard: {}", e),
     };
@@ -267,9 +267,15 @@ pub fn process_leaderboard_full(db: &Database, config: &BotConfig) -> String {
         return "📊 No hay submissions en el leaderboard".to_string();
     }
 
+    let order_label = match order_by {
+        "datetime" => "Ordenado por Fecha",
+        _ => "Ordenado por Ganancia",
+    };
+
     let mut response = format!(
-        "🏆 **Leaderboard Completo - {}**\n\n",
-        config.competition.name
+        "🏆 **Leaderboard Completo - {} ({})** \n\n",
+        config.competition.name,
+        order_label
     );
     response.push_str("| Pos | Nombre | TS | 💰 Elegido | 💰 Esperada | 📊 Envíos | 📈 Máximo |\n");
     response.push_str("|---|---|---|---|---|---|---|\n");
