@@ -232,14 +232,13 @@ impl Bot {
         } else if content == "all submits" && is_teacher {
             info!("Processing all submits command (teacher)");
             submission::process_all_submits(&self.db)
-        } else if content.starts_with("user submits ") && is_teacher {
+        } else if content.starts_with("user submits") && is_teacher {
             info!("Processing user submits command (teacher)");
-            let parts: Vec<&str> = message.content.trim().split_whitespace().collect();
-            if parts.len() >= 3 {
-                let user_identifier = parts[2..].join(" ");
-                submission::process_user_submits(&user_identifier, &self.db)
+            // Extract user_id from Zulip mention format: @**Name|user_id**
+            if let Some(user_id) = self.extract_mentioned_user_id(&message.content) {
+                submission::process_user_submits_by_id(user_id, &self.db)
             } else {
-                "❌ Uso: user submits <email_o_nombre>".to_string()
+                "❌ Uso: user submits @usuario (usa la mención de Zulip)".to_string()
             }
         } else if content == "help" {
             info!("Processing help command");
@@ -262,6 +261,20 @@ impl Bot {
         }
     }
 
+    fn extract_mentioned_user_id(&self, content: &str) -> Option<i64> {
+        // Zulip mentions come in format: @**Name|user_id** or @**Name**
+        // We need to extract the user_id from the pipe format
+        use regex::Regex;
+        let re = Regex::new(r"@\*\*[^|]+\|(\d+)\*\*").unwrap();
+        
+        if let Some(captures) = re.captures(content) {
+            if let Some(user_id_str) = captures.get(1) {
+                return user_id_str.as_str().parse::<i64>().ok();
+            }
+        }
+        None
+    }
+
     fn get_help_message(&self, is_teacher: bool) -> String {
         let comp = &self.config.competition;
 
@@ -275,7 +288,7 @@ impl Bot {
                 • `duplicates` - Listar envíos duplicados\n\
                 • `leaderboard [gain|datetime]` - Leaderboard completo con estadísticas (ordenado por ganancia o fecha)\n\
                 • `all submits` - Ver todos los envíos del sistema\n\
-                • `user submits <email_o_nombre>` - Ver envíos de un usuario específico\n\
+                • `user submits @usuario` - Ver envíos de un usuario (usa mención @)\n\
                 • `help` - Mostrar esta ayuda\n\n\
                 **Nota:** Los profesores no pueden enviar submissions.",
                 comp.name, comp.description, comp.deadline
