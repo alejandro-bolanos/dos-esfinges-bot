@@ -141,7 +141,7 @@ impl Database {
         Ok(duplicates)
     }
 
-    pub fn get_leaderboard(&self) -> Result<Vec<(String, String, String, f64, i32, Option<f64>)>> {
+    pub fn get_leaderboard(&self) -> Result<Vec<(String, String, String, f64, f64, i32, Option<f64>)>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
             "WITH last_valid_submission AS (
@@ -150,6 +150,7 @@ impl Database {
                     user_full_name,
                     user_email,
                     actual_gain,
+                    expected_gain,
                     timestamp,
                     ROW_NUMBER() OVER (
                         PARTITION BY user_id 
@@ -166,6 +167,7 @@ impl Database {
                     s.timestamp,
                     COUNT(*) as total_submissions,
                     lvs.actual_gain as final_gain,
+                    lvs.expected_gain as final_expected_gain,
                     MAX(CASE WHEN s.after_deadline = 0 THEN s.actual_gain END) as max_gain
                 FROM submissions s
                 LEFT JOIN last_valid_submission lvs 
@@ -177,6 +179,7 @@ impl Database {
                 user_email,
                 timestamp,
                 final_gain,
+                final_expected_gain,
                 total_submissions,
                 max_gain
             FROM user_stats
@@ -191,8 +194,9 @@ impl Database {
                     row.get::<_, String>(1)?,
                     row.get::<_, String>(2)?,
                     row.get::<_, f64>(3)?,
-                    row.get::<_, i32>(4)?,
-                    row.get::<_, Option<f64>>(5)?,
+                    row.get::<_, f64>(4)?,
+                    row.get::<_, i32>(5)?,
+                    row.get::<_, Option<f64>>(6)?,
                 ))
             })?
             .collect::<Result<Vec<_>, _>>()?;

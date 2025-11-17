@@ -271,21 +271,22 @@ pub fn process_leaderboard_full(db: &Database, config: &BotConfig) -> String {
         "🏆 **Leaderboard Completo - {}**\n\n",
         config.competition.name
     );
-    response.push_str("| Pos | Nombre | TS | 💰 Mejor | 📊 Envíos | 📈 Máximo |\n");
-    response.push_str("|---|---|---|---|---|---|\n");
+    response.push_str("| Pos | Nombre | TS | 💰 Elegido | 💰 Esperada | 📊 Envíos | 📈 Máximo |\n");
+    response.push_str("|---|---|---|---|---|---|---|\n");
 
-    for (i, (name, email, ts, best_gain, total, max_gain)) in results.iter().enumerate() {
+    for (i, (name, email, ts, best_gain, expected_gain, total, max_gain)) in results.iter().enumerate() {
         if !config.teachers.contains(email) {
             let max_str = max_gain
                 .map(|a| format!("{:.2}", a))
                 .unwrap_or_else(|| "N/A".to_string());
             let ts_str: String = ts.chars().take(16).collect();
             response.push_str(&format!(
-                "| {} | {} | {} | {:.2} | {} | {} |\n",
+                "| {} | {} | {} | {:.2} | {:.2} | {} | {} |\n",
                 i + 1,
                 name,
                 ts_str,
                 best_gain,
+                expected_gain,
                 total,
                 max_str
             ));
