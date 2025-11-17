@@ -288,4 +288,17 @@ impl Database {
 
         Ok(submissions)
     }
+
+    pub fn get_users_with_submissions(&self) -> Result<Vec<i64>> {
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT user_id FROM submissions",
+        )?;
+
+        let user_ids = stmt
+            .query_map([], |row| row.get::<_, i64>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(user_ids)
+    }
 }

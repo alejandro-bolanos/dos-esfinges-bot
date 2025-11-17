@@ -232,6 +232,9 @@ impl Bot {
         } else if content == "all submits" && is_teacher {
             info!("Processing all submits command (teacher)");
             submission::process_all_submits(&self.db)
+        } else if content == "no submits" && is_teacher {
+            info!("Processing no submits command (teacher)");
+            submission::process_no_submits(&self.db, &self.client, &self.config).await
         } else if content.starts_with("user submits") && is_teacher {
             info!("Processing user submits command (teacher)");
             // Extract user_id from Zulip mention format: @**Name|user_id**
@@ -288,6 +291,7 @@ impl Bot {
                 • `duplicates` - Listar envíos duplicados\n\
                 • `leaderboard [gain|datetime]` - Leaderboard completo con estadísticas (ordenado por ganancia o fecha)\n\
                 • `all submits` - Ver todos los envíos del sistema\n\
+                • `no submits` - Ver usuarios sin envíos ordenados por última conexión\n\
                 • `user submits @usuario` - Ver envíos de un usuario (usa mención @)\n\
                 • `help` - Mostrar esta ayuda\n\n\
                 **Nota:** Los profesores no pueden enviar submissions.",

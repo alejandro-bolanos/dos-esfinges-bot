@@ -53,3 +53,25 @@ pub struct GainResult {
 pub struct ZulipEventsResponse {
     pub events: Vec<Event>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ZulipUser {
+    pub user_id: i64,
+    pub full_name: String,
+    pub email: String,
+    #[serde(default)]
+    pub is_bot: bool,
+    #[serde(default)]
+    pub is_active: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZulipUsersResponse {
+    pub members: Vec<ZulipUser>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZulipUserPresence {
+    #[serde(default)]
+    pub timestamp: i64,
+}

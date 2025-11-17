@@ -13,6 +13,7 @@ use crate::config::BotConfig;
 use crate::database::Database;
 use crate::master_data::MasterData;
 use crate::models::{GainResult, Message, Submission};
+use crate::zulip::ZulipClient;
 
 pub async fn process_submit(
     message: &Message,
@@ -367,6 +368,93 @@ pub fn process_user_submits_by_id(user_id: i64, db: &Database) -> String {
             sub.actual_gain,
             sub.threshold_category,
             deadline_mark
+        ));
+    }
+
+    response
+}
+
+pub async fn process_no_submits(db: &Database, client: &ZulipClient, config: &BotConfig) -> String {
+    use chrono::DateTime;
+
+    // Get all users from Zulip
+    let all_users = match client.get_all_users().await {
+        Ok(users) => users,
+        Err(e) => return format!("❌ Error obteniendo usuarios de Zulip: {}", e),
+    };
+
+    // Get users who have submitted
+    let users_with_submissions = match db.get_users_with_submissions() {
+        Ok(ids) => ids.into_iter().collect::<HashSet<_>>(),
+        Err(e) => return format!("❌ Error obteniendo envíos: {}", e),
+    };
+
+    // Filter: active users, not bots, not teachers, no submissions
+    let users_without_submissions: Vec<_> = all_users
+        .into_iter()
+        .filter(|user| {
+            user.is_active
+                && !user.is_bot
+                && !config.teachers.contains(&user.email)
+                && !users_with_submissions.contains(&user.user_id)
+        })
+        .collect();
+
+    if users_without_submissions.is_empty() {
+        return "✅ Todos los usuarios activos han enviado al menos un submit".to_string();
+    }
+
+    // Get presence info for each user
+    let mut user_presence_list = Vec::new();
+    for user in users_without_submissions {
+        let last_active = client.get_user_presence(user.user_id).await.ok().flatten();
+        user_presence_list.push((user, last_active));
+    }
+
+    // Sort by last active time (most recent first, then by name for users without presence)
+    user_presence_list.sort_by(|a, b| {
+        match (a.1, b.1) {
+            (Some(ts_a), Some(ts_b)) => ts_b.cmp(&ts_a), // Most recent first
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.0.full_name.cmp(&b.0.full_name),
+        }
+    });
+
+    // Build response
+    let mut response = format!(
+        "📋 **Usuarios sin Envíos ({}):**\n\n",
+        user_presence_list.len()
+    );
+    response.push_str("| # | Nombre | 📅 Última Conexión | ⏰ Tiempo desde última conexión |\n");
+    response.push_str("|---|---|---|---|\n");
+
+    let now = Utc::now();
+    for (i, (user, last_active_ts)) in user_presence_list.iter().enumerate() {
+        let (last_conn_str, time_diff_str) = if let Some(ts) = last_active_ts {
+            let dt = DateTime::from_timestamp(*ts, 0)
+                .unwrap_or_else(|| Utc::now());
+            let duration = now.signed_duration_since(dt);
+            let days = duration.num_days();
+            let hours = duration.num_hours() % 24;
+            
+            let last_conn = dt.format("%Y-%m-%d %H:%M").to_string();
+            let time_diff = if days > 0 {
+                format!("{}d {}h", days, hours)
+            } else {
+                format!("{}h", hours)
+            };
+            (last_conn, time_diff)
+        } else {
+            ("N/A".to_string(), "N/A".to_string())
+        };
+
+        response.push_str(&format!(
+            "| {} | {} | {} | {} |\n",
+            i + 1,
+            user.full_name,
+            last_conn_str,
+            time_diff_str
         ));
     }
 

@@ -1,6 +1,7 @@
-use crate::models::{Event, ZulipEventsResponse};
+use crate::models::{Event, ZulipEventsResponse, ZulipUser, ZulipUsersResponse};
 use anyhow::Result;
 use reqwest::Client;
+use serde_json::Value;
 
 pub struct ZulipClient {
     email: String,
@@ -123,5 +124,53 @@ impl ZulipClient {
             .await?;
 
         Ok(response.bytes().await?.to_vec())
+    }
+
+    pub async fn get_all_users(&self) -> Result<Vec<ZulipUser>> {
+        let url = format!("{}/api/v1/users", self.site);
+
+        let response = self
+            .client
+            .get(&url)
+            .basic_auth(&self.email, Some(&self.api_key))
+            .send()
+            .await?;
+
+        let data: ZulipUsersResponse = response.json().await?;
+        Ok(data.members)
+    }
+
+    pub async fn get_user_presence(&self, user_id: i64) -> Result<Option<i64>> {
+        let url = format!("{}/api/v1/users/{}/presence", self.site, user_id);
+
+        let response = self
+            .client
+            .get(&url)
+            .basic_auth(&self.email, Some(&self.api_key))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Ok(None);
+        }
+
+        let data: Value = response.json().await?;
+        
+        // Zulip presence API returns aggregated presence with a timestamp
+        // Try to get the most recent timestamp from aggregated or any client
+        let timestamp = data["presence"]["aggregated"]["timestamp"]
+            .as_i64()
+            .or_else(|| {
+                // Try to find any presence timestamp from clients
+                data["presence"]
+                    .as_object()
+                    .and_then(|obj| {
+                        obj.values()
+                            .filter_map(|v| v["timestamp"].as_i64())
+                            .max()
+                    })
+            });
+
+        Ok(timestamp)
     }
 }
