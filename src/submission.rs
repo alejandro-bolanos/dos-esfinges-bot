@@ -4,7 +4,7 @@ use csv::ReaderBuilder;
 use rand::seq::SliceRandom;
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use tracing::{info, warn};
@@ -461,6 +461,7 @@ pub async fn process_no_submits(db: &Database, client: &ZulipClient, config: &Bo
     response
 }
 
+
 pub fn process_all_submits(db: &Database) -> String {
     let submissions = match db.get_all_submissions() {
         Ok(s) => s,
@@ -471,31 +472,88 @@ pub fn process_all_submits(db: &Database) -> String {
         return "📋 No hay envíos registrados en el sistema".to_string();
     }
 
-    let mut response = "📋 **Todos los Envíos del Sistema:**\n\n".to_string();
-    response.push_str("| ID | Usuario | Nombre | 📅 Fecha | 💰 Esperada | ✨ Real | 🎯 | ⏰ |\n");
-    response.push_str("|---|---|---|---|---|---|---|---|\n");
+    // Group submissions by user_id
+    let mut submissions_by_user: HashMap<i64, Vec<&Submission>> = HashMap::new();
+    for sub in &submissions {
+        submissions_by_user
+            .entry(sub.user_id)
+            .or_insert_with(Vec::new)
+            .push(sub);
+    }
 
-    for sub in submissions {
-        let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
-        let ts_str: String = sub.timestamp.chars().take(16).collect();
-        response.push_str(&format!(
-            "|{}|{}|{}|{}|{:.2}|{:.2}|{}|{}|\n",
-            sub.id.unwrap_or(0),
-            if sub.user_full_name.is_empty() {
+    // Create a flat list with user submissions grouped together
+    let mut grouped_submissions = Vec::new();
+    let mut user_ids: Vec<_> = submissions_by_user.keys().collect();
+    user_ids.sort(); // Sort by user_id for consistent ordering
+
+    for user_id in user_ids {
+        if let Some(user_subs) = submissions_by_user.get(user_id) {
+            for sub in user_subs {
+                grouped_submissions.push(*sub);
+            }
+        }
+    }
+
+    // Paginate into chunks of 50 rows
+    const ROWS_PER_PAGE: usize = 50;
+    let total_pages = (grouped_submissions.len() + ROWS_PER_PAGE - 1) / ROWS_PER_PAGE;
+
+    let mut messages = Vec::new();
+
+    for (page_num, chunk) in grouped_submissions.chunks(ROWS_PER_PAGE).enumerate() {
+        let mut response = format!(
+            "📋 **Todos los Envíos del Sistema (Página {}/{}):**\n\n",
+            page_num + 1,
+            total_pages
+        );
+        response.push_str("| ID | Usuario | Nombre | 📅 Fecha | 💰 Esperada | ✨ Real | 🎯 | ⏰ |\n");
+        response.push_str("|---|---|---|---|---|---|---|---|\n");
+
+        let mut current_user_id = None;
+        
+        for sub in chunk {
+            // Add a visual separator when switching to a new user
+            if current_user_id.is_some() && current_user_id != Some(sub.user_id) {
+                response.push_str("|---|---|---|---|---|---|---|---|\n");
+            }
+            current_user_id = Some(sub.user_id);
+
+            let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
+            let ts_str: String = sub.timestamp.chars().take(16).collect();
+            let user_display = if sub.user_full_name.is_empty() {
                 &sub.user_email
             } else {
                 &sub.user_full_name
-            },
-            sub.submission_name,
-            ts_str,
-            sub.expected_gain,
-            sub.actual_gain,
-            sub.threshold_category,
-            deadline_mark
-        ));
+            };
+
+            response.push_str(&format!(
+                "|{}|{}|{}|{}|{:.2}|{:.2}|{}|{}|\n",
+                sub.id.unwrap_or(0),
+                user_display,
+                sub.submission_name,
+                ts_str,
+                sub.expected_gain,
+                sub.actual_gain,
+                sub.threshold_category,
+                deadline_mark
+            ));
+        }
+
+        if page_num < total_pages - 1 {
+            response.push_str(&format!("\n*Continúa en la página {}...*", page_num + 2));
+        } else {
+            response.push_str(&format!(
+                "\n\n**Total:** {} envíos de {} usuarios",
+                grouped_submissions.len(),
+                submissions_by_user.len()
+            ));
+        }
+
+        messages.push(response);
     }
 
-    response
+    // Join all messages with a delimiter that the caller can split on
+    messages.join("\n\n---PAGE_BREAK---\n\n")
 }
 
 // Helper functions
