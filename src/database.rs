@@ -78,19 +78,19 @@ impl Database {
         Ok(conn.last_insert_rowid())
     }
 
-    pub fn get_user_submissions(&self, user_id: i64) -> Result<Vec<Submission>> {
+    pub fn get_user_submissions(&self, user_name: &str) -> Result<Vec<Submission>> {
         let conn = self.get_connection()?;
         let mut stmt = conn.prepare(
             "SELECT id, user_id, user_email, user_full_name, submission_name,
                     timestamp, file_checksum, file_path, expected_gain, actual_gain,
                     tp, tn, fp, fn, positives_predicted, threshold_category, after_deadline
              FROM submissions
-             WHERE user_id = ?1
+             WHERE user_full_name = ?1
              ORDER BY timestamp DESC",
         )?;
 
         let submissions = stmt
-            .query_map([user_id], |row| {
+            .query_map([user_name], |row| {
                 Ok(Submission {
                     id: Some(row.get(0)?),
                     user_id: row.get(1)?,

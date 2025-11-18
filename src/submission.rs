@@ -206,8 +206,8 @@ pub async fn process_submit(
     response
 }
 
-pub fn process_list_submits(user_id: i64, db: &Database) -> String {
-    let submissions = match db.get_user_submissions(user_id) {
+pub fn process_list_submits(user_name: &str, db: &Database) -> String {
+    let submissions = match db.get_user_submissions(user_name) {
         Ok(s) => s,
         Err(e) => return format!("❌ Error obteniendo envíos: {}", e),
     };
@@ -334,44 +334,6 @@ pub fn process_user_submits(user_identifier: &str, db: &Database) -> String {
     response
 }
 
-pub fn process_user_submits_by_id(user_id: i64, db: &Database) -> String {
-    let submissions = match db.get_user_submissions(user_id) {
-        Ok(s) => s,
-        Err(e) => return format!("❌ Error obteniendo envíos: {}", e),
-    };
-
-    if submissions.is_empty() {
-        return "📋 No se encontraron envíos para el usuario mencionado".to_string();
-    }
-
-    // Get user info from first submission
-    let user_name = if !submissions[0].user_full_name.is_empty() {
-        &submissions[0].user_full_name
-    } else {
-        &submissions[0].user_email
-    };
-
-    let mut response = format!("📋 **Envíos de {}:**\n\n", user_name);
-    response.push_str("| ID | Nombre | 📅 Fecha | 💰 Esperada | ✨ Real | 🎯 | ⏰ |\n");
-    response.push_str("|---|---|---|---|---|---|---|\n");
-
-    for sub in submissions {
-        let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
-        let ts_str: String = sub.timestamp.chars().take(16).collect();
-        response.push_str(&format!(
-            "|{}|{}|{}|{:.2}|{:.2}|{}|{}|\n",
-            sub.id.unwrap_or(0),
-            sub.submission_name,
-            ts_str,
-            sub.expected_gain,
-            sub.actual_gain,
-            sub.threshold_category,
-            deadline_mark
-        ));
-    }
-
-    response
-}
 
 pub fn process_all_submits(db: &Database) -> String {
     let submissions = match db.get_all_submissions() {

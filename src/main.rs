@@ -13,6 +13,8 @@ use database::Database;
 use master_data::MasterData;
 use zulip::ZulipClient;
 
+use regex::Regex;
+
 #[derive(Parser)]
 #[command(name = "dos_esfinges_bot")]
 #[command(about = "Bot de Zulip para competencias tipo Kaggle", long_about = None)]
@@ -212,7 +214,7 @@ impl Bot {
                 .to_string()
         } else if content == "list submits" && !is_teacher {
             info!("Processing list submits command");
-            submission::process_list_submits(message.sender_id, &self.db)
+            submission::process_list_submits(&message.sender_full_name, &self.db)
         } else if content == "duplicates" && is_teacher {
             info!("Processing duplicates command (teacher)");
             submission::process_duplicates(&self.db)
@@ -234,9 +236,8 @@ impl Bot {
             submission::process_all_submits(&self.db)
         } else if content.starts_with("user submits") && is_teacher {
             info!("Processing user submits command (teacher)");
-            // Extract user_id from Zulip mention format: @**Name|user_id**
-            if let Some(user_id) = self.extract_mentioned_user_id(&message.content) {
-                submission::process_user_submits_by_id(user_id, &self.db)
+            if let Some(user_name) = self.extract_mentioned_user_name(&message.content) {
+                submission::process_user_submits(&user_name, &self.db)
             } else {
                 "❌ Uso: user submits @usuario (usa la mención de Zulip)".to_string()
             }
@@ -261,19 +262,20 @@ impl Bot {
         }
     }
 
-    fn extract_mentioned_user_id(&self, content: &str) -> Option<i64> {
-        // Zulip mentions come in format: @**Name|user_id** or @**Name**
-        // We need to extract the user_id from the pipe format
-        use regex::Regex;
-        let re = Regex::new(r"@\*\*[^|]+\|(\d+)\*\*").unwrap();
-        
-        if let Some(captures) = re.captures(content) {
-            if let Some(user_id_str) = captures.get(1) {
-                return user_id_str.as_str().parse::<i64>().ok();
-            }
+    fn extract_mentioned_user_name(&self, content: &str) -> Option<String> {
+    let re = Regex::new(r"@\*\*([\w|\s]+)\*\*").ok()?;
+
+    if let Some(captures) = re.captures(content) {
+        if let Some(inner_match) = captures.get(1) {
+            let text = inner_match.as_str();
+            Some(text.to_string())
+        } else {
+            None
         }
+    } else {
         None
     }
+}
 
     fn get_help_message(&self, is_teacher: bool) -> String {
         let comp = &self.config.competition;
