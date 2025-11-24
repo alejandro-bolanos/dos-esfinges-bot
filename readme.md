@@ -84,7 +84,8 @@ Esto creará un archivo `config.json` de ejemplo.
   "competition": {
     "name": "Competencia ML 2025",
     "description": "Descripción de la competencia",
-    "deadline": "2025-12-31T23:59:59Z"
+    "deadline": "2025-12-31T23:59:59Z",
+    "results_reveal_date": "2026-01-01T23:59:59Z"
   }
 }
 ```

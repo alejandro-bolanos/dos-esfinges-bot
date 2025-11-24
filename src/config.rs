@@ -64,6 +64,7 @@ pub struct CompetitionConfig {
     pub name: String,
     pub description: String,
     pub deadline: String,
+    pub results_reveal_date: String,
 }
 
 impl BotConfig {
@@ -138,6 +139,7 @@ pub fn create_config_template() -> Result<()> {
             name: "Competencia ML - Dos Esfinges".to_string(),
             description: "Competencia de machine learning usando DosEsfingesBot".to_string(),
             deadline: "2025-12-31T23:59:59".to_string(),
+            results_reveal_date: "2026-01-01T23:59:59".to_string(),
         },
     };
 

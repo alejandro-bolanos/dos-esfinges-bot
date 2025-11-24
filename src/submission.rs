@@ -207,7 +207,24 @@ pub async fn process_submit(
     response
 }
 
-pub fn process_list_submits(user_name: &str, db: &Database) -> String {
+/// Verifica si ya se pueden revelar los resultados completos
+fn results_revealed(config: &BotConfig) -> bool {
+    let reveal_date = &config.competition.results_reveal_date;
+    // Intentar parsear la fecha de revelación
+    let reveal_dt = match DateTime::parse_from_rfc3339(reveal_date) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(_) => {
+            // Intentar parsear sin timezone
+            match chrono::NaiveDateTime::parse_from_str(reveal_date, "%Y-%m-%dT%H:%M:%S") {
+                Ok(naive_dt) => DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc),
+                Err(_) => return false, // Si no se puede parsear, no revelar
+            }
+        }
+    };
+    Utc::now() >= reveal_dt
+}
+
+pub fn process_list_submits(user_name: &str, db: &Database, config: &BotConfig) -> String {
     let submissions = match db.get_user_submissions(user_name) {
         Ok(s) => s,
         Err(e) => return format!("❌ Error obteniendo envíos: {}", e),
@@ -217,24 +234,58 @@ pub fn process_list_submits(user_name: &str, db: &Database) -> String {
         return "📋 No tienes envíos registrados".to_string();
     }
 
-    let mut response = "📋 **Tus Envíos:**\n\n".to_string();
-    response.push_str("| ID | Nombre | 📅 Fecha | 💰 Esperada | 🎯 Categoría | ⏰ |\n");
-    response.push_str("|---|---|---|---|---|---|\n");
+    let show_results = results_revealed(config);
 
-    for sub in submissions {
-        let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
-        let ts_str: String = sub.timestamp.chars().take(16).collect();
-        response.push_str(&format!(
-            "|{}|{}|{}|{:.2}|{}|{}|\n",
-            sub.id.unwrap_or(0),
-            sub.submission_name,
-            ts_str,
-            sub.expected_gain,
-            sub.threshold_category,
-            deadline_mark
-        ));
+    let mut response = "📋 **Tus Envíos:**\n\n".to_string();
+    
+    if show_results {
+        // Mostrar información completa después de la fecha de revelación
+        response.push_str("| ID | Nombre | 📅 Fecha | 💰 Esperada | ✨ Real | 🎯 Categoría | ⏰ |\n");
+        response.push_str("|---|---|---|---|---|---|---|\n");
+
+        for sub in submissions {
+            let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
+            let ts_str: String = sub.timestamp.chars().take(16).collect();
+            response.push_str(&format!(
+                "|{}|{}|{}|{:.2}|{:.2}|{}|{}|\n",
+                sub.id.unwrap_or(0),
+                sub.submission_name,
+                ts_str,
+                sub.expected_gain,
+                sub.actual_gain,
+                sub.threshold_category,
+                deadline_mark
+            ));
+        }
+    } else {
+        // Mostrar información limitada antes de la fecha de revelación
+        response.push_str("| ID | Nombre | 📅 Fecha | 💰 Esperada | 🎯 Categoría | ⏰ |\n");
+        response.push_str("|---|---|---|---|---|---|\n");
+
+        for sub in submissions {
+            let deadline_mark = if sub.after_deadline { "⚠️" } else { "✅" };
+            let ts_str: String = sub.timestamp.chars().take(16).collect();
+            response.push_str(&format!(
+                "|{}|{}|{}|{:.2}|{}|{}|\n",
+                sub.id.unwrap_or(0),
+                sub.submission_name,
+                ts_str,
+                sub.expected_gain,
+                sub.threshold_category,
+                deadline_mark
+            ));
+        }
     }
 
+    // Informar cuándo se revelarán los resultados si aún no se han revelado
+    if !show_results {
+        let reveal_date = &config.competition.results_reveal_date; 
+        let reveal_str: String = reveal_date.chars().take(16).collect();
+        response.push_str(&format!(
+            "\n📊 *Los resultados completos se revelarán el {}*",
+            reveal_str
+        ));
+    }
     response
 }
 

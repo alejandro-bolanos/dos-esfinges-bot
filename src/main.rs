@@ -214,7 +214,7 @@ impl Bot {
                 .to_string()
         } else if content == "list submits" && !is_teacher {
             info!("Processing list submits command");
-            submission::process_list_submits(&message.sender_full_name, &self.db)
+            submission::process_list_submits(&message.sender_full_name, &self.db, &self.config)
         } else if content == "duplicates" && is_teacher {
             info!("Processing duplicates command (teacher)");
             submission::process_duplicates(&self.db)
@@ -293,7 +293,7 @@ impl Bot {
                 • `duplicates` - Listar envíos duplicados\n\
                 • `leaderboard [gain|datetime]` - Leaderboard completo con estadísticas (ordenado por ganancia o fecha)\n\
                 • `all submits` - Ver todos los envíos del sistema\n\
-                • `no submits` - Ver usuarios sin envíos ordenados por última conexión\n\
+                • `no submits` - USAR POCO. Ver usuarios sin envíos ordenados por última conexión\n\
                 • `user submits @usuario` - Ver envíos de un usuario (usa mención @)\n\
                 • `help` - Mostrar esta ayuda\n\n\
                 **Nota:** Los profesores no pueden enviar submissions.",
